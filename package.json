@@ -1,0 +1,10 @@
+{
+  "name": "cardwars-showdown",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "echo 'No tests yet'"
+  }
+}
