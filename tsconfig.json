@@ -8,8 +8,7 @@
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
-    "baseUrl": "."
+    "skipLibCheck": true
   },
   "include": ["sim/**/*"]
 }
