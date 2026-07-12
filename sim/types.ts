@@ -1,5 +1,6 @@
 export type PlayerId = "p1" | "p2";
 export type BattlePhase = "setup" | "draw" | "main" | "combat" | "finished";
+export type FormatMode = "constructed" | "sealed" | "draft" | "doubles";
 export type CardFaction =
   | "adventure"
   | "fire"
@@ -60,6 +61,24 @@ export interface BattleOptions {
   drawPerTurn?: number;
   maxTurns?: number;
   laneCount?: number;
+  startingHealth?: number;
+}
+
+export interface FormatDefinition {
+  id: string;
+  name: string;
+  description: string;
+  mode: FormatMode;
+  players: number;
+  lanes: number;
+  deckSize: number;
+  startingHealth: number;
+  startingHandSize: number;
+  resourcesPerTurn: number;
+  drawPerTurn: number;
+  maxCopiesPerCard: number;
+  bannedCardIds: string[];
+  restrictedCardIds: string[];
 }
 
 export interface BattleLogEntry {
@@ -78,8 +97,10 @@ export interface BattleLaneSnapshot {
 export interface BattleSideSnapshot {
   id: PlayerId;
   health: number;
+  maxHealth: number;
   resources: number;
   deckSize: number;
+  maxDeckSize: number;
   hand: CardSummary[];
   discardSize: number;
   board: CardSummary[];

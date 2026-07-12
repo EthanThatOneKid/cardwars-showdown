@@ -9,7 +9,7 @@ export interface LaneState {
 export class Field {
   readonly lanes: LaneState[];
 
-  constructor(laneCount = 3) {
+  constructor(laneCount = 4) {
     this.lanes = Array.from({ length: laneCount }, () => ({ p1: null, p2: null }));
   }
 

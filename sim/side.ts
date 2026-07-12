@@ -8,17 +8,21 @@ export class Side {
   readonly hand: Card[] = [];
   discard: Card[] = [];
   health = 30;
+  maxHealth = 30;
   resources = 0;
+  maxDeckSize = 40;
 
   constructor(id: PlayerId) {
     this.id = id;
   }
 
-  loadDeck(decklist: DeckList, owner: PlayerId = this.id): void {
+  loadDeck(decklist: DeckList, owner: PlayerId = this.id, maxHealth = 30, maxDeckSize = decklist.cards.length): void {
     this.deck = decklist.cards.map(cardId => new Card(dex.getCard(cardId), owner));
     this.hand.length = 0;
     this.discard = [];
-    this.health = 30;
+    this.health = maxHealth;
+    this.maxHealth = maxHealth;
+    this.maxDeckSize = maxDeckSize;
     this.resources = 0;
   }
 
@@ -62,8 +66,10 @@ export class Side {
     return {
       id: this.id,
       health: this.health,
+      maxHealth: this.maxHealth,
       resources: this.resources,
       deckSize: this.deck.length,
+      maxDeckSize: this.maxDeckSize,
       hand: this.hand.map(card => card.toSummary()),
       discardSize: this.discard.length,
       board: board.map(card => card.toSummary()),
