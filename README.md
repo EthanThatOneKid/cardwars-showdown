@@ -4,31 +4,20 @@ Authentic Adventure Time Card Wars simulator inspired by the rules engine and de
 
 ## Current scope
 
-- supported format: `singles`
+- supported format: `cardwars-singles`
 - deterministic 1v1 battle flow
 - lane model, health, resources, draw, combat, and logging
 - unit test harness via `bun test`
 
-## Project requirements
+## Project requirement
 
-- Match the official Card Wars ruleset as faithfully as possible
-- Keep the engine deterministic and repeatable
-- Treat new formats as explicit additions, not assumptions
-- Expand coverage with unit tests before adding new mechanics
+This project is aiming at an authentic, tournament-legal Card Wars rules engine. If a rule is not implemented yet, the engine should say so clearly rather than pretending coverage is complete.
 
-## Battle engine notes
+## What is currently true
 
-- `singles` is the only supported format right now
-- the engine is a true rules engine only for the mechanics it currently models
-- unsupported mechanics should fail loudly rather than silently pretending to be implemented
-
-## Current supported format
-
-- `cardwars-singles`
-
-## Status
-
-The test suite now covers the supported singles format and the basic battle loop. The next gap is deeper Card Wars rules fidelity: card text, timing windows, lane-specific effects, hero identity rules, and any official deck-building restrictions that apply to the real tournament format.
+- `cardwars-singles` is the only supported format right now.
+- The engine is deterministic for the mechanics it currently models.
+- The test suite exists, but it is not yet exhaustive for the full official ruleset.
 
 ## Current gaps before full tournament legality
 
@@ -42,7 +31,7 @@ The test suite now covers the supported singles format and the basic battle loop
 
 - `bun test` is wired up.
 - The first unit-test harness exists.
-- Coverage is still growing, but the singles path is now the primary target.
+- Coverage is still growing, and the simulator is not yet a complete rules oracle.
 
 ## Scaffold
 
