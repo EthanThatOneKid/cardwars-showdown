@@ -1,4 +1,4 @@
-import type { CardAbility, CardFaction, CardInstance, CardSummary, CardTemplate, CardType, PlayerId } from "./types.js";
+import type { CardInstance, CardSummary, CardTemplate, PlayerId } from "./types.js";
 
 let nextUid = 1;
 
@@ -7,14 +7,15 @@ export class Card implements CardInstance {
   readonly owner: PlayerId;
   readonly id: string;
   readonly name: string;
+  readonly type: CardTemplate["type"];
   readonly cost: number;
   readonly attack: number;
   readonly health: number;
-  readonly faction?: CardFaction;
-  readonly type?: CardType;
-  readonly text?: string;
+  readonly text: string;
+  readonly faction: string;
+  readonly flavor?: string;
   readonly tags: string[];
-  readonly abilities: CardAbility[];
+  readonly abilities: CardTemplate["abilities"];
   damage = 0;
   exhausted = false;
   lane: number | null = null;
@@ -24,12 +25,13 @@ export class Card implements CardInstance {
     this.owner = owner;
     this.id = template.id;
     this.name = template.name;
+    this.type = template.type;
     this.cost = template.cost;
     this.attack = template.attack;
     this.health = template.health;
-    this.faction = template.faction;
-    this.type = template.type;
     this.text = template.text;
+    this.faction = template.faction;
+    this.flavor = template.flavor;
     this.tags = [...(template.tags ?? [])];
     this.abilities = [...(template.abilities ?? [])];
     this.damage = state.damage ?? 0;
@@ -49,14 +51,15 @@ export class Card implements CardInstance {
     return {
       id: this.id,
       name: this.name,
+      type: this.type,
       cost: this.cost,
       attack: this.attack,
       health: this.health,
-      faction: this.faction,
-      type: this.type,
       text: this.text,
+      faction: this.faction,
+      flavor: this.flavor,
       tags: [...this.tags],
-      abilities: [...this.abilities],
+      abilities: this.abilities ? [...this.abilities] : undefined,
     };
   }
 

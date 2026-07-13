@@ -36,9 +36,8 @@ export class Battle {
     this.p2.loadDeck(p2Deck, "p2", config.startingHealth, p2Deck.cards.length);
     this.p1.resources = config.startingResources;
     this.p2.resources = config.startingResources;
-    const handSize = config.startingHandSize;
-    this.p1.draw(handSize);
-    this.p2.draw(handSize);
+    this.p1.draw(config.startingHandSize);
+    this.p2.draw(config.startingHandSize);
     this.logEvent("system", "Battle started", "setup");
   }
 
@@ -98,12 +97,8 @@ export class Battle {
         this.logEvent("system", `Lane ${laneIndex + 1} deals ${p2Card.attack} damage to p1`, "combat");
       }
 
-      if (p1Card && !p1Card.alive) {
-        lane.p1 = null;
-      }
-      if (p2Card && !p2Card.alive) {
-        lane.p2 = null;
-      }
+      if (p1Card && !p1Card.alive) lane.p1 = null;
+      if (p2Card && !p2Card.alive) lane.p2 = null;
     }
   }
 

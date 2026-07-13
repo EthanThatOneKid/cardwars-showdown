@@ -1,40 +1,33 @@
 export type PlayerId = "p1" | "p2";
 export type BattlePhase = "setup" | "draw" | "main" | "combat" | "finished";
-export type FormatMode = "constructed" | "sealed" | "draft" | "doubles";
-export type CardFaction =
-  | "adventure"
-  | "fire"
-  | "water"
-  | "ice"
-  | "beast"
-  | "candy"
-  | "machine"
-  | "mystery";
-export type CardType = "hero" | "creature" | "spell" | "artifact";
+export type CardFaction = string;
+export type CardType = "creature" | "spell" | "building" | "hero" | "artifact";
+export type CardAbilityTiming = "static" | "triggered" | "activated";
 
 export interface CardAbility {
   id: string;
   name: string;
   text: string;
-  timing: "static" | "triggered" | "activated";
+  timing: CardAbilityTiming;
 }
 
 export interface CardTemplate {
   id: string;
   name: string;
+  type: CardType;
   cost: number;
   attack: number;
   health: number;
-  faction?: CardFaction;
-  type?: CardType;
-  text?: string;
+  text: string;
+  faction: CardFaction;
+  flavor?: string;
   tags?: string[];
   abilities?: CardAbility[];
 }
 
 export interface CardInstance extends CardTemplate {
-  uid: string;
   owner: PlayerId;
+  uid: string;
   damage: number;
   exhausted: boolean;
   lane: number | null;
@@ -50,42 +43,26 @@ export interface CardSummary extends CardTemplate {
 }
 
 export interface DeckList {
-  name?: string;
+  name: string;
   cards: string[];
-}
-
-export interface BattleOptions {
-  startingHandSize?: number;
-  startingResources?: number;
-  resourcesPerTurn?: number;
-  drawPerTurn?: number;
-  maxTurns?: number;
-  laneCount?: number;
-  startingHealth?: number;
 }
 
 export interface FormatDefinition {
   id: string;
   name: string;
   description: string;
-  mode: FormatMode;
+  mode: "constructed";
   players: number;
   lanes: number;
-  deckSize: number;
   startingHealth: number;
   startingHandSize: number;
+  startingResources: number;
   resourcesPerTurn: number;
   drawPerTurn: number;
+  deckSize: number;
   maxCopiesPerCard: number;
   bannedCardIds: string[];
   restrictedCardIds: string[];
-}
-
-export interface BattleLogEntry {
-  turn: number;
-  actor: PlayerId | "system";
-  message: string;
-  phase?: BattlePhase;
 }
 
 export interface BattleLaneSnapshot {
@@ -95,23 +72,42 @@ export interface BattleLaneSnapshot {
 }
 
 export interface BattleSideSnapshot {
-  id: PlayerId;
+  player: PlayerId;
   health: number;
   maxHealth: number;
   resources: number;
   deckSize: number;
   maxDeckSize: number;
   hand: CardSummary[];
+  handSize: number;
   discardSize: number;
   board: CardSummary[];
 }
 
-export interface BattleSnapshot {
-  turn?: number;
+export interface BattleLogEntry {
+  turn: number;
+  actor: PlayerId | "system";
+  message: string;
   phase?: BattlePhase;
-  activePlayer?: PlayerId | null;
-  winner?: PlayerId | null;
-  lanes?: BattleLaneSnapshot[];
-  sides?: Record<PlayerId, BattleSideSnapshot>;
+}
+
+export interface BattleSnapshot {
+  turn: number;
+  phase: BattlePhase;
+  activePlayer: PlayerId;
+  winner: PlayerId | null;
+  lanes: BattleLaneSnapshot[];
+  sides: Record<PlayerId, BattleSideSnapshot>;
   log: BattleLogEntry[];
+}
+
+export interface BattleOptions {
+  formatId?: string;
+  startingHandSize?: number;
+  startingResources?: number;
+  resourcesPerTurn?: number;
+  drawPerTurn?: number;
+  maxTurns?: number;
+  laneCount?: number;
+  startingHealth?: number;
 }

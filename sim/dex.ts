@@ -1,13 +1,23 @@
 import { CARD_POOL } from "./data/cards.js";
 import type { CardTemplate } from "./types.js";
 
+function normalizeCardId(id: string): string {
+  return id.trim().toLowerCase().replace(/[-\s]+/g, "_");
+}
+
 export class Dex {
   getCard(id: string): CardTemplate {
-    const card = CARD_POOL[id];
-    if (!card) {
-      throw new Error(`Unknown card: ${id}`);
+    const direct = CARD_POOL[id];
+    if (direct) {
+      return direct;
     }
-    return card;
+
+    const normalized = CARD_POOL[normalizeCardId(id)];
+    if (normalized) {
+      return normalized;
+    }
+
+    throw new Error(`Unknown card: ${id}`);
   }
 
   getAllCards(): CardTemplate[] {

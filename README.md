@@ -1,21 +1,30 @@
 # cardwars-showdown
 
-Authentic Adventure Time Card Wars simulator inspired by Pokemon Showdown's battle engine.
+Authentic Adventure Time Card Wars simulator inspired by the rules engine and determinism discipline of Pokémon Showdown.
 
-## Project requirement
+## Current scope
 
-The first milestone is a tournament-legal **Card Wars Singles** ruleset. That means the simulator must faithfully model the official 1v1 constructed format before we expand to anything else.
+- supported format: `singles`
+- deterministic 1v1 battle flow
+- lane model, health, resources, draw, combat, and logging
+- unit test harness via `bun test`
+
+## Project requirements
+
+- Match the official Card Wars ruleset as faithfully as possible
+- Keep the engine deterministic and repeatable
+- Treat new formats as explicit additions, not assumptions
+- Expand coverage with unit tests before adding new mechanics
+
+## Battle engine notes
+
+- `singles` is the only supported format right now
+- the engine is a true rules engine only for the mechanics it currently models
+- unsupported mechanics should fail loudly rather than silently pretending to be implemented
 
 ## Current supported format
 
 - `cardwars-singles`
-
-## Verification strategy
-
-- Keep format data explicit and snapshot-friendly.
-- Verify singles setup invariants: 2 players, 4 lanes, 40-card decks, 25 HP, 5-card opening hand, 2 resources per turn, 1 draw per turn.
-- Verify deterministic battle flow: turn order, placement, lane combat, damage, and win resolution.
-- Add regression tests for every rule we implement before expanding the ruleset.
 
 ## Status
 
