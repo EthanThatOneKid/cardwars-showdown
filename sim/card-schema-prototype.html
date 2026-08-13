@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Wars — Card Data Model Prototype</title>
+<style>
+  :root { --accent:#4a90d9; --ink:#1a2233; --muted:#6b7280; --line:#e2e6ee; --ok:#2f9e57; --warn:#d97706; --err:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink); background:#f6f7f9; line-height:1.45; }
+  header { background:#fff; border-bottom:1px solid var(--line); padding:20px 28px; }
+  header h1 { margin:0 0 6px; font-size:20px; }
+  header p { margin:0; max-width:980px; color:var(--muted); font-size:13.5px; }
+  main { max-width:1020px; margin:0 auto; padding:20px 28px 60px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-bottom:18px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  h3 { font-size:13.5px; margin:18px 0 8px; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .tab { font:inherit; font-size:13px; padding:6px 12px; border-radius:7px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  .tab.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .code { font-family:ui-monospace,Consolas,monospace; font-size:12.5px; background:#0f172a; color:#d7e3f4; border-radius:8px; padding:14px 16px; overflow:auto; white-space:pre; }
+  .code .k { color:#7dd3fc; } .code .s { color:#86efac; } .code .c { color:#94a3b8; } .code .t { color:#f9a8d4; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; }
+  .card { border:1px solid var(--line); border-radius:9px; padding:10px 12px; background:#fbfcfe; cursor:pointer; font-size:12.5px; }
+  .card:hover { border-color:var(--accent); }
+  .card.active { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .card .nm { font-weight:700; }
+  .card .meta { color:var(--muted); font-size:11px; margin:2px 0 6px; }
+  .badge { display:inline-block; background:#eef2f7; border-radius:5px; padding:1px 7px; font-size:10.5px; color:#4b5563; margin-right:4px; }
+  .badge.ok { background:#e5f6ec; color:#1c7c43; }
+  .badge.warn { background:#fdf0dd; color:#a45b06; }
+  .badge.err { background:#fdeaea; color:#a93226; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:900px) { .cols { grid-template-columns:1fr; } }
+  .verbatim { background:#fffdf5; border:1px solid #efe6c9; border-radius:7px; padding:8px 10px; font-style:italic; font-size:13px; }
+  .kv { font-size:12.5px; }
+  .kv b { color:var(--muted); font-weight:600; }
+  table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  th, td { border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  th { background:#f2f4f8; }
+  .okrow td { background:#f3fbf6; }
+  .warnrow td { background:#fffaf0; }
+  .log { max-height:220px; overflow:auto; font-family:ui-monospace,Consolas,monospace; font-size:12px; background:#0f172a; color:#d7e3f4; border-radius:8px; padding:10px 12px; }
+  .log div { padding:1px 0; }
+  .log .err { color:#ffb3b3; }
+  .log .ok { color:#86efac; }
+  .hint { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Card Wars — Card Data Model Prototype</h1>
+  <p>Question this demo answers: <b>what schema encodes official card text?</b> The engine needs a card data model that survives the full six-faction pool (134 cards) and plugs into the event-core timing windows accepted in the #10 prototype. This page proposes a schema and fills it with real card entries covering every ability shape the pool actually uses — continuous effects, enter/start-of-turn triggers, activated costs, Floops, replacements, play restrictions, cost modifiers, and variable X/X stats. Verbatim text stays authoritative; the schema adds routing metadata. Cards too complex to structure degrade to <code>unsupported</code> — never a guessed interpretation. Stats/text come from <code>docs/research/card-pool.md</code>.</p>
+</header>
+<main>
+  <div class="tabs" id="tabs"></div>
+
+  <section class="panel" id="tab-schema">
+    <h2>The schema (TypeScript shape)</h2>
+    <div class="code" id="schema-code"></div>
+    <h3>How the schema meets the pool</h3>
+    <div class="kv" id="schema-notes"></div>
+  </section>
+
+  <section class="panel" id="tab-data">
+    <h2>Sample card entries</h2>
+    <p class="hint">Click a card to see its structured entry. Blue = verbatim-confirmed, amber = flagged for adjudication, red = degrades to <code>unsupported</code>.</p>
+    <div class="grid" id="card-grid"></div>
+    <div style="height:14px"></div>
+    <div class="cols">
+      <div>
+        <h3>Structured entry</h3>
+        <div class="code" id="card-json"></div>
+      </div>
+      <div>
+        <h3>Verbatim text</h3>
+        <div class="verbatim" id="card-text"></div>
+        <h3>Why it degrades (if flagged)</h3>
+        <div class="kv" id="card-why"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-taxonomy">
+    <h2>Ability taxonomy — every shape in the 134-card pool</h2>
+    <table id="taxonomy"></table>
+    <p class="hint">Counts are distinct cards in <code>docs/research/card-pool.md</code> exercising each shape. A card can exercise several (e.g. Dr. Death is an activated destroy-cost + Floop).</p>
+  </section>
+
+  <section class="panel" id="tab-validate">
+    <h2>Schema validation (data-integrity surface, ties to #9)</h2>
+    <p class="hint">Runs a validator over every sample entry: shape checks, enum membership, required fields by card type, ability routing rules. This is the seed of the engine's card-data <code>validate</code>.</p>
+    <button class="btn" id="btn-validate" style="font:inherit;font-size:13px;padding:6px 12px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer">Run validation</button>
+    <div style="height:10px"></div>
+    <div class="log" id="validate-log"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+/* =====================================================================
+   PURE LOGIC MODULE — liftable into the real engine later.
+   No DOM, no document. Everything below the === SHELL === marker is
+   throwaway page wiring.
+   ===================================================================== */
+const CW = (() => {
+  const FACTIONS = ["cornfield", "blue-plains", "useless-swamp", "sandy-lands", "nice-lands", "rainbow"];
+  const CARD_TYPES = ["creature", "building", "spell"];
+  const ABILITY_KINDS = ["continuous", "trigger", "activated", "floop", "replacement", "play-restriction", "cost-modifier", "variable-stat"];
+  const WINDOWS = [
+    "onCanFight", "onCalculateATK", "onCalculateDEF", "onFloop", "onAfterPlayCard",
+    "onAfterFight", "onLandscapeFlipped", "onDestroyed", "onEnterPlay", "onLeavePlay",
+    "onStartOfTurn", "onEndOfTurn", "onDamageDealt", "onDraw", "onDiscard", "onChangeLane",
+    "onCanPlay", "onCalculateCost",
+  ];
+
+  /* ---- schema: shape rules, one key per check ---- */
+  const SCHEMA = {
+    id:      c => typeof c.id === "string" && c.id.length > 0,
+    name:    c => typeof c.name === "string" && c.name.length > 0,
+    type:    c => CARD_TYPES.includes(c.type),
+    faction: c => FACTIONS.includes(c.faction),
+    actionCost: c => Number.isInteger(c.actionCost) && c.actionCost >= 0,
+    landscapeCost: c => Number.isInteger(c.landscapeCost) && c.landscapeCost >= 0,
+    stats:   c => c.type !== "creature" || (c.atk != null || c.def != null || c.abilities.some(a => a.kind === "variable-stat")),
+    text:    c => typeof c.text === "string" && c.text.length > 0,
+    verified: c => ["verbatim", "needs-verification"].includes(c.verified),
+    abilities: c => Array.isArray(c.abilities) && c.abilities.every(AB_OK),
+    buildingSpellNoStats: c => c.type === "creature" || (c.atk == null && c.def == null),
+    rainbowCostRule: c => c.faction !== "rainbow" || c.actionCost === 0 || c.landscapeCost === 0,
+  };
+
+  function AB_OK(a) {
+    if (typeof a !== "object" || a == null) return false;
+    if (!ABILITY_KINDS.includes(a.kind)) return false;
+    if (a.window != null && !WINDOWS.includes(a.window)) return false;
+    if (a.cost != null) {
+      if (typeof a.cost !== "object") return false;
+      if (a.cost.type === "exhaust" || a.cost.type === "destroySelf" || a.cost.type === "destroyCreature") return true;
+      if (a.cost.type === "action" || a.cost.type === "discard") return Number.isInteger(a.cost.n) && a.cost.n > 0;
+      if (a.cost.type === "combine") return Array.isArray(a.cost.parts) && a.cost.parts.every(AB_COST);
+      return false;
+    }
+    return true;
+  }
+  function AB_COST(c) { return c != null && (c.type === "exhaust" || c.type === "destroySelf" || c.type === "destroyCreature" || ((c.type === "action" || c.type === "discard") && Number.isInteger(c.n) && c.n > 0)); }
+
+  function validateCard(card) {
+    const problems = [];
+    for (const [key, check] of Object.entries(SCHEMA)) {
+      if (!check(card)) problems.push({ code: "invalid." + key, message: "fails " + key + " check", cardId: card.id });
+    }
+    for (const a of card.abilities) {
+      if (a.kind === "floop" && !(a.cost && a.cost.type === "exhaust"))
+        problems.push({ code: "invalid.floopCost", message: a.id + ": Floop ability must cost exhaust", cardId: card.id });
+      if ((a.kind === "continuous" || a.kind === "trigger") && a.window == null)
+        problems.push({ code: "invalid.window", message: a.id + ": " + a.kind + " ability needs a window", cardId: card.id });
+    }
+    return { ok: problems.length === 0, problems, valid: true };
+  }
+
+  /* ---- the ability taxonomy as derived from the pool ---- */
+  const TAXONOMY = [
+    { kind: "continuous", window: "onCalculateATK / onCalculateDEF / onCanFight", shape: "always-on modifier or protection", examples: "Cool Dog (protection), X-Large Spirit Soldier (+1 ATK adjacent), Struzann Jinn (+2 ATK per Flooped), Wall of Ears (+1 DEF per Cornfield in play)", poolCount: 28 },
+    { kind: "trigger", window: "onEnterPlay / onStartOfTurn / onLeavePlay / onChangeLane", shape: "fires once when an event happens; may carry a condition (e.g. 'if it replaced a Creature')", examples: "Blueberry Djini (enter, replaced → draw 2), Cornataur (enter → 1 dmg per Cornfield), Field Stalker (start of turn → both draw), Travelin' Farmer (leaves → dmg per card in hand)", poolCount: 30 },
+    { kind: "activated", window: "main phase", shape: "pay a cost (Action / discard / destroy self) during your turn; may be repeat-limited", examples: "Uni-Knight (1 Action → -10 ATK), Dragon Foot (discard, up to 5×), Herculeye (discard, once), Green Mermaid (destroy self → dmg each opposing)", poolCount: 14 },
+    { kind: "floop", window: "onFloop", shape: "exhaust instead of Fighting; the #10 prototype verified exhaust + no own-Fight", examples: "The Pig (flip Cornfield), Patchy the Pumpkin (repeated 1 dmg per Cornfield), Embarrassing Bard (draw per Flooped), Cutie (heal 1)", poolCount: 30 },
+    { kind: "replacement", window: "onLandscapeFlipped / onAfterPlayCard", shape: "changes the game state a play/action resolves into", examples: "The Pig (flip Landscape face-down), Husker Worm (flip Cornfield on enter), Big Foot (flip a Landscape face-up)", poolCount: 6 },
+    { kind: "play-restriction", window: "onCanPlay (new)", shape: "extra condition to play the card at all", examples: "Hot Eyebat (need 10+ in discard), Bone Wand (control a Useless Swamp Creature)", poolCount: 3 },
+    { kind: "cost-modifier", window: "onCalculateCost (new)", shape: "changes the Action cost of a card", examples: "Lost Golem (-1 per other Creature played), Teeth Leaf (-2 if 10+ in discard), Unempty Coffin (next Creature -2)", poolCount: 4 },
+    { kind: "variable-stat", window: "onCalculateATK / onCalculateDEF", shape: "printed stat is X; resolved from a formula (usually landscape count)", examples: "Husker Knight (X/X = +1 ATK +2 DEF per Cornfield), Ring of Fluffy (+X where X = damage on it)", poolCount: 2 },
+    { kind: "unsupported", window: "—", shape: "official text the schema cannot structure yet; engine must say unsupported, not guess", examples: "Schoolhouse (random FLOOP copy), Spirit Tower (conditional hand-off), Silo of Truth (steal and play at no cost)", poolCount: 4 },
+  ];
+
+  /* ---- sample card entries ---- */
+  const CARDS = {
+    "cool-dog": {
+      id: "cool-dog", name: "Cool Dog", type: "creature", faction: "blue-plains",
+      actionCost: 2, landscapeCost: 2, atk: 2, def: 7, verified: "verbatim",
+      text: "Your Creatures on adjacent Lanes may not be Attacked.",
+      abilities: [{ id: "cool-dog-protection", kind: "continuous", window: "onCanFight",
+        effect: { op: "block", lanes: "adjacent", note: "Cool Dog itself may still be Attacked" } }],
+    },
+    "husker-knight": {
+      id: "husker-knight", name: "Husker Knight", type: "creature", faction: "cornfield",
+      actionCost: 2, landscapeCost: 2, atk: null, def: null, verified: "verbatim",
+      text: "Husker Knight has +1 ATK and +2 DEF for each Cornfield Landscape you control.",
+      abilities: [{ id: "cornfield-scale", kind: "variable-stat", window: "onCalculateATK",
+        effect: { op: "scale", per: "cornfield-landscape", atk: 1, def: 2 } }],
+    },
+    "the-pig": {
+      id: "the-pig", name: "The Pig", type: "creature", faction: "rainbow",
+      actionCost: 1, landscapeCost: 0, atk: 1, def: 4, verified: "verbatim",
+      text: "FLOOP >>> Flip target Cornfield Landscape in this Lane face down.",
+      abilities: [{ id: "pig-floop", kind: "floop", window: "onFloop", cost: { type: "exhaust" },
+        effect: { op: "flipLandscape", faction: "cornfield", lane: "this", face: "down" } }],
+    },
+    "x-large-spirit-soldier": {
+      id: "x-large-spirit-soldier", name: "X-Large Spirit Soldier", type: "creature", faction: "blue-plains",
+      actionCost: 1, landscapeCost: 1, atk: 1, def: 9, verified: "verbatim",
+      text: "Each adjacent Creature has +1 ATK.",
+      abilities: [{ id: "spirit-aura", kind: "continuous", window: "onCalculateATK",
+        effect: { op: "modify", targets: "adjacent-creatures", atk: 1 } }],
+    },
+    "blueberry-djini": {
+      id: "blueberry-djini", name: "Blueberry Djini", type: "creature", faction: "blue-plains",
+      actionCost: 1, landscapeCost: 1, atk: 2, def: 6, verified: "verbatim",
+      text: "When Blueberry Djini enters play, if it replaced a Creature, draw two cards.",
+      abilities: [{ id: "djini-enter", kind: "trigger", window: "onEnterPlay",
+        condition: "if it replaced a Creature", effect: { op: "draw", n: 2 } }],
+    },
+    "cornataur": {
+      id: "cornataur", name: "Cornataur", type: "creature", faction: "cornfield",
+      actionCost: 2, landscapeCost: 2, atk: 2, def: 10, verified: "verbatim",
+      text: "When Cornataur enters play, deal 1 Damage to your opponent for each Cornfield Landscape you control.",
+      abilities: [{ id: "cornataur-enter", kind: "trigger", window: "onEnterPlay",
+        effect: { op: "damageHeroPer", n: 1, per: "cornfield-landscape", target: "opponent" } }],
+    },
+    "field-stalker": {
+      id: "field-stalker", name: "Field Stalker", type: "creature", faction: "cornfield",
+      actionCost: 1, landscapeCost: 1, atk: 1, def: 10, verified: "verbatim", adjudicated: true,
+      text: "At the start of your turn, each player draws a card.",
+      abilities: [{ id: "stalker-draw", kind: "trigger", window: "onStartOfTurn",
+        effect: { op: "draw", n: 1, each: true }, note: "affects opponent too; mandatory?" }],
+    },
+    "sandhorn-devil": {
+      id: "sandhorn-devil", name: "Sandhorn Devil", type: "creature", faction: "sandy-lands",
+      actionCost: 1, landscapeCost: 1, atk: 3, def: 6, verified: "verbatim", adjudicated: true,
+      text: "When Sandhorn Devil enters play, deal 1 Damage to each Creature in play (including each of your Creatures).",
+      abilities: [{ id: "devil-enter", kind: "trigger", window: "onEnterPlay",
+        effect: { op: "damageEachCreature", n: 1, includeSelf: true }, note: "global simultaneous; order pending" }],
+    },
+    "uni-knight": {
+      id: "uni-knight", name: "Uni-Knight", type: "creature", faction: "blue-plains",
+      actionCost: 1, landscapeCost: 1, atk: 3, def: 4, verified: "verbatim", adjudicated: true,
+      text: "Pay 1 Action >>> Target Creature in this Lane has -10 ATK this turn.",
+      abilities: [{ id: "uni-knight-act", kind: "activated", window: "onEndOfTurn",
+        cost: { type: "action", n: 1 }, effect: { op: "modify", targets: "creature-in-lane", atk: -10, duration: "this-turn" },
+        note: "negative ATK ruling needed" }],
+    },
+    "dragon-foot": {
+      id: "dragon-foot", name: "Dragon Foot", type: "creature", faction: "useless-swamp",
+      actionCost: 1, landscapeCost: 1, atk: 1, def: 5, verified: "verbatim",
+      text: "Discard a card >>> Dragon Foot has +1 ATK this turn. (Use up to five times during each of your turns.)",
+      abilities: [{ id: "dragon-foot-act", kind: "activated", cost: { type: "discard", n: 1 },
+        repeat: "up-to-five", effect: { op: "modify", targets: "self", atk: 1, duration: "this-turn" } }],
+    },
+    "patchy-the-pumpkin": {
+      id: "patchy-the-pumpkin", name: "Patchy the Pumpkin", type: "creature", faction: "cornfield",
+      actionCost: 1, landscapeCost: 1, atk: 0, def: 5, verified: "needs-verification",
+      text: "FLOOP >>> Deal 1 Damage to target Creature. Do this once for each Cornfield Landscape you control. (May only target each Creature once.)",
+      abilities: [{ id: "patchy-floop", kind: "floop", window: "onFloop", cost: { type: "exhaust" },
+        effect: { op: "damageTargetPer", n: 1, per: "cornfield-landscape", perTargetOnce: true } }],
+    },
+    "hot-eyebat": {
+      id: "hot-eyebat", name: "Hot Eyebat", type: "creature", faction: "useless-swamp",
+      actionCost: 1, landscapeCost: 1, atk: 4, def: 4, verified: "verbatim",
+      text: "Play Hot Eyebat only if you have 10 or more cards in your discard pile.",
+      abilities: [{ id: "hot-eyebat-restrict", kind: "play-restriction", window: "onCanPlay",
+        effect: { op: "require", discardCount: ">= 10" } }],
+    },
+    "lost-golem": {
+      id: "lost-golem", name: "Lost Golem", type: "creature", faction: "sandy-lands",
+      actionCost: 3, landscapeCost: 3, atk: 5, def: 6, verified: "verbatim",
+      text: "Lost Golem costs 1 less to play for each other Creature you have played this turn.",
+      abilities: [{ id: "lost-golem-cost", kind: "cost-modifier", window: "onCalculateCost",
+        effect: { op: "modifyCost", per: "other-creature-played-this-turn", n: -1 } }],
+    },
+    "green-mermaid": {
+      id: "green-mermaid", name: "Green Mermaid", type: "creature", faction: "useless-swamp",
+      actionCost: 1, landscapeCost: 1, atk: 1, def: 9, verified: "verbatim", adjudicated: true,
+      text: "Destroy Green Mermaid >>> Deal 1 Damage to each opposing Creature.",
+      abilities: [{ id: "mermaid-self-destroy", kind: "activated", cost: { type: "destroySelf" },
+        effect: { op: "damageEachOpposingCreature", n: 1 }, note: "destroy-self ordering pending" }],
+    },
+    "gnome-snot": {
+      id: "gnome-snot", name: "Gnome Snot", type: "spell", faction: "blue-plains",
+      actionCost: 1, landscapeCost: 1, verified: "verbatim",
+      text: "Draw 3 cards.",
+      abilities: [{ id: "gnome-snot-draw", kind: "trigger", window: "onAfterPlayCard",
+        effect: { op: "draw", n: 3 } }],
+    },
+    "pyramidia": {
+      id: "pyramidia", name: "Pyramidia", type: "building", faction: "blue-plains",
+      actionCost: 1, landscapeCost: 1, verified: "verbatim",
+      text: "FLOOP >>> If you control a Creature in this Lane, gain 1 Action. Use it only to play a Creature into this Lane.",
+      abilities: [{ id: "pyramidia-floop", kind: "floop", window: "onFloop", cost: { type: "exhaust" },
+        effect: { op: "gainAction", n: 1, restrictedTo: "play-creature-into-this-lane" } }],
+    },
+    "ancient-scholar": {
+      id: "ancient-scholar", name: "Ancient Scholar", type: "creature", faction: "blue-plains",
+      actionCost: 1, landscapeCost: 1, atk: 1, def: 7, verified: "needs-verification",
+      text: "FLOOP >>> Return a random Rainbow card from your Discard Pile to your Hand. If you Control a Building in this Lane, gain 1 Action.",
+      abilities: [{ id: "scholar-floop", kind: "floop", window: "onFloop", cost: { type: "exhaust" },
+        effect: { op: "unsupported", reason: "multi-clause conditional FLOOP; verbatim text must be re-confirmed" } }],
+    },
+    "schoolhouse": {
+      id: "schoolhouse", name: "Schoolhouse", type: "building", faction: "blue-plains",
+      actionCost: 1, landscapeCost: 1, verified: "needs-verification",
+      text: "FLOOP >>> Your Creature in this Lane loses all abilities and gains the FLOOP ability of a random Creature (with a FLOOP ability) in your discard pile until end of turn.",
+      abilities: [{ id: "schoolhouse-floop", kind: "floop", window: "onFloop", cost: { type: "exhaust" },
+        effect: { op: "unsupported", reason: "copies a random FLOOP ability from discard; no base-rules mechanic" } }],
+    },
+  };
+
+  /* ---- helpers ---- */
+  const kindMeta = kind => TAXONOMY.find(t => t.kind === kind);
+  const isVerb = c => c.verified === "verbatim";
+  const flagged = c => c.adjudicated === true;
+  const unsupported = c => c.abilities.some(a => a.effect && a.effect.op === "unsupported");
+  function classify(c) {
+    if (unsupported(c)) return "err";
+    if (flagged(c)) return "warn";
+    return "ok";
+  }
+
+  return { CARDS, SCHEMA, TAXONOMY, WINDOWS, FACTIONS, validateCard, classify, isVerb, flagged, unsupported, kindMeta };
+})();
+/* =====================================================================
+   SHELL — throwaway page wiring.
+   ===================================================================== */
+
+const SCHEMA_CODE = `type Faction = "cornfield" | "blue-plains" | "useless-swamp"
+  | "sandy-lands" | "nice-lands" | "rainbow";
+type CardType = "creature" | "building" | "spell";
+
+interface Card {
+  id: string;
+  name: string;
+  type: CardType;
+  faction: Faction;
+  actionCost: number;    // Actions paid from the 2 per turn
+  landscapeCost: number; // face-up Landscapes of faction needed; 0 for Rainbow
+  atk?: number | null;   // creatures only; null = variable (X/X)
+  def?: number | null;
+  text: string;          // VERBATIM official text — always authoritative
+  verified: "verbatim" | "needs-verification";
+  adjudicated?: boolean; // flagged for a pending ruling
+  abilities: Ability[];
+}
+
+type AbilityKind = "continuous" | "trigger" | "activated" | "floop"
+  | "replacement" | "play-restriction" | "cost-modifier"
+  | "variable-stat" | "unsupported";
+
+interface Ability {
+  id: string;
+  kind: AbilityKind;
+  window?: EventWindow;   // which timing window it hooks (see #10)
+  cost?: AbilityCost;     // for activated / floop
+  condition?: string;     // verbatim "if ..." guard
+  repeat?: "once" | "up-to-five" | "any-number" | "per-landscape";
+  effect: EffectOp;       // structured op, or { op: "unsupported", reason }
+}
+
+type EventWindow = "onCanFight" | "onCalculateATK" | "onCalculateDEF"
+  | "onFloop" | "onAfterPlayCard" | "onAfterFight" | "onLandscapeFlipped"
+  | "onDestroyed" | "onEnterPlay" | "onLeavePlay" | "onStartOfTurn"
+  | "onEndOfTurn" | "onDamageDealt" | "onDraw" | "onDiscard" | "onChangeLane"
+  | "onCanPlay" | "onCalculateCost";
+
+type AbilityCost =
+  | { type: "exhaust" }                     // FLOOP
+  | { type: "action"; n: number }
+  | { type: "discard"; n: number }
+  | { type: "destroySelf" }
+  | { type: "destroyCreature" }
+  | { type: "combine"; parts: AbilityCost[] }; // e.g. Dr. Death`;
+
+const SCHEMA_NOTES = [
+  "<b>Verbatim text wins.</b> <code>text</code> is the source of truth for rulings; <code>abilities[]</code> is routing metadata the engine's event core uses to attach handlers.",
+  "<b>Landscape cost is explicit, not derived.</b> Base rule: equals Action cost for faction cards, 0 for Rainbow — but storing it separately lets the schema survive rule tweaks and cost-modifiers.",
+  "<b>ATK/DEF null = variable.</b> Husker Knight prints X/X; the stat is resolved from its ability, never guessed. The #10 <code>onCalculateATK/DEF</code> windows already re-derive stats live.",
+  "<b>Degrade to unsupported, don't guess.</b> Multi-clause or copy-an-ability text (Schoolhouse, Spirit Tower, Silo of Truth) carries <code>{ op: \"unsupported\" }</code> so the engine says so rather than invent a mechanic.",
+  "<b>Two new windows implied.</b> The pool needs <code>onCanPlay</code> (play restrictions: Hot Eyebat) and <code>onCalculateCost</code> (cost modifiers: Lost Golem, Unempty Coffin) beyond the #10 set.",
+  "<b>Data-integrity seed.</b> The validator below mirrors these rules; it becomes the card-side of the engine's <code>validate</code> (#9) and the exhaustive-runner's pool gate.",
+];
+
+/* ---- shell wiring ---- */
+const state = { selected: "cool-dog", activeTab: "schema" };
+
+function el(id) { return document.getElementById(id); }
+
+function renderTabs() {
+  const tabs = [
+    ["schema", "Schema"],
+    ["data", "Sample cards"],
+    ["taxonomy", "Ability taxonomy"],
+    ["validate", "Validation"],
+  ];
+  el("tabs").innerHTML = tabs.map(([k, label]) =>
+    `<button class="tab ${state.activeTab === k ? "active" : ""}" data-tab="${k}">${label}</button>`).join("");
+  document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => {
+    state.activeTab = b.dataset.tab;
+    renderTabs();
+    document.querySelectorAll("section").forEach(s => s.style.display = s.id === "tab-" + state.activeTab ? "" : "none");
+  });
+  document.querySelectorAll("section").forEach(s => s.style.display = s.id === "tab-" + state.activeTab ? "" : "none");
+}
+
+function renderSchema() {
+  el("schema-code").innerHTML = SCHEMA_CODE.split("\n").map(hl).join("\n");
+  el("schema-notes").innerHTML = SCHEMA_NOTES.map(n => `<p>${n}</p>`).join("");
+}
+
+function hl(line) {
+  return line
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\/\/.*$/, m => `<span class="c">${m}</span>`)
+    .replace(/\b(type|interface|const|let|for|in|of|new)\b/g, `<span class="k">$1</span>`)
+    .replace(/"(?:[^"\\]|\\.)*"/g, `<span class="s">$&</span>`)
+    .replace(/\b(Ability|Card|EventWindow|Faction|CardType|AbilityKind|EffectOp|AbilityCost)\b/g, `<span class="t">$1</span>`);
+}
+
+function renderGrid() {
+  const cards = Object.values(CW.CARDS);
+  el("card-grid").innerHTML = cards.map(c => {
+    const cls = CW.classify(c);
+    const badge = cls === "ok" ? `<span class="badge ok">verbatim</span>` : cls === "warn" ? `<span class="badge warn">adjudicate</span>` : `<span class="badge err">unsupported</span>`;
+    return `<div class="card ${state.selected === c.id ? "active" : ""}" data-card="${c.id}">
+      <div class="nm">${c.name}</div>
+      <div class="meta">${c.type} · ${c.faction} · cost ${c.actionCost}${c.type === "creature" ? ` · ${c.atk == null ? "X" : c.atk}/${c.def == null ? "X" : c.def}` : ""}</div>
+      ${badge}
+    </div>`;
+  }).join("");
+  document.querySelectorAll("[data-card]").forEach(b => b.onclick = () => {
+    state.selected = b.dataset.card;
+    renderGrid();
+    renderDetail();
+  });
+}
+
+function renderDetail() {
+  const c = CW.CARDS[state.selected];
+  el("card-json").innerHTML = JSON.stringify(c, null, 2).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  el("card-text").textContent = c.text;
+  const unsup = c.abilities.filter(a => a.effect && a.effect.op === "unsupported");
+  el("card-why").innerHTML =
+    (unsup.length ? unsup.map(a => `<p><span class="badge err">unsupported</span> ${a.effect.reason || "no base-rules mechanic"}</p>`).join("") : "") +
+    (c.adjudicated ? `<p><span class="badge warn">adjudication flag</span> ${c.abilities.filter(a => a.note).map(a => a.note).join("; ")}</p>` : "") +
+    (c.verified === "needs-verification" ? `<p><span class="badge warn">re-verify</span> full official wording to be re-confirmed against card scans.</p>` : "") +
+    (unsup.length === 0 && !c.adjudicated && c.verified === "verbatim" ? `<p><span class="badge ok">fully structured</span> this card encodes cleanly into the schema.</p>` : "");
+}
+
+function renderTaxonomy() {
+  const rows = CW.TAXONOMY.map(t => `<tr>
+    <td><code>${t.kind}</code></td>
+    <td><code>${t.window}</code></td>
+    <td>${t.shape}</td>
+    <td>${t.examples}</td>
+    <td style="text-align:center">${t.poolCount}</td>
+  </tr>`).join("");
+  el("taxonomy").innerHTML = `<tr><th>Kind</th><th>Timing window</th><th>Shape</th><th>Example cards</th><th>Pool</th></tr>` + rows;
+}
+
+function renderValidate() {
+  const log = el("validate-log");
+  log.innerHTML = "";
+  const out = [];
+  for (const c of Object.values(CW.CARDS)) {
+    const r = CW.validateCard(c);
+    const cls = r.ok ? "ok" : "err";
+    out.push(`<div class="${cls}">${c.id}: ${r.ok ? "PASS" : "FAIL"}</div>`);
+    for (const p of r.problems) out.push(`<div class="err">  - ${p.code}: ${p.message}</div>`);
+  }
+  const total = Object.keys(CW.CARDS).length;
+  const pass = Object.values(CW.CARDS).filter(c => CW.validateCard(c).ok).length;
+  out.unshift(`<div class="${pass === total ? "ok" : "err"}">${pass}/${total} sample cards pass the schema validator.</div>`);
+  log.innerHTML = out.join("");
+}
+
+el("btn-validate").onclick = renderValidate;
+
+renderTabs();
+renderSchema();
+renderGrid();
+renderDetail();
+renderTaxonomy();
+renderValidate();
+</script>
+</body>
+</html>
