@@ -1,88 +1,53 @@
-import { Card } from "./card.js";
-import { dex } from "./dex.js";
-import type {
-  BattleSideSnapshot,
-  DeckList,
-  PlayerId,
-  SideSnapshot,
-} from "./types.js";
+import type { BattleState, CardInstance, CardTemplate, PlayerId, SideState } from "./types.js";
 
-export class Side {
-  player: PlayerId;
-  deck: Card[] = [];
-  hand: Card[] = [];
-  discard: Card[] = [];
-  resources = 0;
-  maxHealth = 25;
-  health = 25;
-  maxDeckSize = 40;
+let nextUid = 1;
 
-  constructor(player: PlayerId) {
-    this.player = player;
-  }
+export function freshUid(): string {
+  return `card-${nextUid++}`;
+}
 
-  loadDeck(list: DeckList, owner: PlayerId, startingHealth: number, maxDeckSize: number): void {
-    this.player = owner;
-    this.maxHealth = startingHealth;
-    this.health = startingHealth;
-    this.maxDeckSize = maxDeckSize;
-    this.deck = list.cards.map((id, index) => {
-      const template = dex.getCard(id);
-      return new Card(template, index);
-    });
-    this.hand = [];
-    this.discard = [];
-    this.resources = 0;
-  }
+export function makeInstance(template: CardTemplate, owner: PlayerId): CardInstance {
+  return {
+    ...template,
+    abilities: [...template.abilities],
+    owner,
+    uid: freshUid(),
+    damage: 0,
+    exhausted: false,
+    flooped: false,
+    lane: null,
+  };
+}
 
-  draw(count: number): Card[] {
-    const drawn: Card[] = [];
-    while (count > 0 && this.deck.length > 0) {
-      const card = this.deck.shift();
-      if (!card) break;
-      this.hand.push(card);
-      drawn.push(card);
-      count -= 1;
-    }
-    return drawn;
-  }
+export function side(battle: BattleState, player: PlayerId): SideState {
+  return battle.sides[player];
+}
 
-  startTurn(resourcesPerTurn: number): void {
-    this.resources += resourcesPerTurn;
-  }
+export function other(player: PlayerId): PlayerId {
+  return player === "p1" ? "p2" : "p1";
+}
 
-  playCard(index: number): Card {
-    const [card] = this.hand.splice(index, 1);
-    if (!card) {
-      throw new Error(`No card at hand index ${index}`);
-    }
-    if (card.cost > this.resources) {
-      throw new Error(`Not enough resources for ${card.name}`);
-    }
-    this.resources -= card.cost;
-    card.exhausted = true;
-    this.discard.push(card);
-    return card;
-  }
+export function draw(battle: BattleState, player: PlayerId): CardInstance | null {
+  const s = side(battle, player);
+  const card = s.deck.shift();
+  if (card) s.hand.push(card);
+  return card ?? null;
+}
 
-  takeDamage(amount: number): void {
-    this.health = Math.max(0, this.health - amount);
-  }
+export function discardFromHand(battle: BattleState, player: PlayerId, index: number): CardInstance | null {
+  const s = side(battle, player);
+  const [card] = s.hand.splice(index, 1);
+  if (card) s.discard.push(card);
+  return card ?? null;
+}
 
-  isDefeated(): boolean {
-    return this.health <= 0;
-  }
+export function randomDiscard(battle: BattleState, player: PlayerId): CardInstance | null {
+  const s = side(battle, player);
+  const card = s.deck.shift();
+  if (card) s.discard.push(card);
+  return card ?? null;
+}
 
-  snapshot(board: Card[]): BattleSideSnapshot {
-    return {
-      player: this.player,
-      health: this.health,
-      maxHealth: this.maxHealth,
-      deckSize: this.deck.length,
-      handSize: this.hand.length,
-      discardSize: this.discard.length,
-      resources: this.resources,
-      board: board.map(card => card.toSummary()),
-    };
-  }
+export function log(battle: BattleState, actor: PlayerId | "system", message: string, phase = battle.phase): void {
+  battle.log.push({ turn: battle.turn, actor, message, phase });
 }
