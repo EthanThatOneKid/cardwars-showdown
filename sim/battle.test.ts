@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { Battle } from "./battle.js";
 
 function deck(name: string, cardId = "cow"): { name: string; cards: string[] } {
@@ -33,9 +33,19 @@ function autoPlay(battle: Battle, maxTurns: number): void {
 }
 
 describe("deterministic core", () => {
+  it("rejects an illegal deck at start and accepts a legal one", () => {
+    const illegal = new Battle({ seed: 1 });
+    expect(() => illegal.start(deck("p1"), deck("p2"))).toThrow(/Illegal deck/);
+    const legal = new Battle({ seed: 1 });
+    const pool = ["cool-dog", "dragon-claw", "heavenly-gazer", "psionic-architect", "corn-lord", "corn-ronin", "husker-worm", "dark-angel", "fatapillar", "mouthball", "sand-knights", "sandsnake", "albino-eyebat", "cutie", "cow"];
+    const legalDeck = { name: "legal", cards: Array.from({ length: 40 }, (_, i) => pool[i % pool.length]) };
+    legal.start(legalDeck, legalDeck);
+    expect(legal.state.phase).toBe("ready");
+  });
+
   it("same seed produces byte-identical logs", () => {
-    const a = new Battle({ seed: 42 });
-    const b = new Battle({ seed: 42 });
+    const a = new Battle({ seed: 42 , skipValidation: true });
+    const b = new Battle({ seed: 42 , skipValidation: true });
     a.start(mixedDeck("a"), mixedDeck("b"));
     b.start(mixedDeck("a"), mixedDeck("b"));
     autoPlay(a, 20);
@@ -46,8 +56,8 @@ describe("deterministic core", () => {
   });
 
   it("different seeds diverge", () => {
-    const a = new Battle({ seed: 1 });
-    const b = new Battle({ seed: 2 });
+    const a = new Battle({ seed: 1 , skipValidation: true });
+    const b = new Battle({ seed: 2 , skipValidation: true });
     a.start(mixedDeck("a"), mixedDeck("b"));
     b.start(mixedDeck("a"), mixedDeck("b"));
     autoPlay(a, 20);
@@ -56,7 +66,7 @@ describe("deterministic core", () => {
   });
 
   it("toJSON/fromJSON round-trips state exactly", () => {
-    const a = new Battle({ seed: 7 });
+    const a = new Battle({ seed: 7 , skipValidation: true });
     a.start(mixedDeck("a"), mixedDeck("b"));
     autoPlay(a, 5);
     const json = a.toJSON();
@@ -66,7 +76,7 @@ describe("deterministic core", () => {
   });
 
   it("setup deals 5, first player from seeded RNG", () => {
-    const battle = new Battle({ seed: 3 });
+    const battle = new Battle({ seed: 3 , skipValidation: true });
     battle.start(deck("a"), deck("b"));
     expect(battle.state.sides.p1.hand.length).toBe(5);
     expect(battle.state.sides.p2.hand.length).toBe(5);
@@ -74,7 +84,7 @@ describe("deterministic core", () => {
   });
 
   it("first player cannot Fight or Floop on turn 1", () => {
-    const battle = new Battle({ seed: 0 });
+    const battle = new Battle({ seed: 0 , skipValidation: true });
     battle.start(mixedDeck("a"), mixedDeck("b"), "p1");
     battle.beginTurn();
     expect(battle.canFight("p1", 0).ok).toBe(false);
@@ -91,7 +101,7 @@ describe("deterministic core", () => {
   });
 
   it("HP clamps at 0 and a winner is declared", () => {
-    const battle = new Battle({ seed: 5 });
+    const battle = new Battle({ seed: 5 , skipValidation: true });
     battle.start(deck("a"), deck("b"), "p1");
     battle.state.sides.p2.hp = 3;
     battle.beginTurn();
@@ -105,7 +115,7 @@ describe("deterministic core", () => {
   });
 
   it("mulligan allowed only once and only without 2 creatures", () => {
-    const battle = new Battle({ seed: 1 });
+    const battle = new Battle({ seed: 1 , skipValidation: true });
     battle.start(deck("a"), deck("b"), "p1");
     // All-creature hand: no mulligan offered.
     expect(battle.canMulligan("p1")).toBe(false);
@@ -118,3 +128,4 @@ describe("deterministic core", () => {
     expect(battle.canMulligan("p1")).toBe(false);
   });
 });
+

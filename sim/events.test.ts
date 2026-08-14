@@ -10,7 +10,7 @@ function deck(cardId: string): { name: string; cards: string[] } {
 }
 
 function battleWith(seed = 0): Battle {
-  const b = new Battle({ seed });
+  const b = new Battle({ seed, skipValidation: true });
   b.start(deck("cow"), deck("cow"));
   return b;
 }

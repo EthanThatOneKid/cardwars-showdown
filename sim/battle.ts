@@ -6,6 +6,7 @@ import { singles } from "./data/formats.js";
 import { draw, log, makeInstance, other, side } from "./side.js";
 import { faceUpFactions } from "./field.js";
 import { atk, canFight as canFightEvent, def, runEvent } from "./events.js";
+import { requireValidDeck } from "./validate.js";
 
 export class Battle {
   state: BattleState;
@@ -31,6 +32,10 @@ export class Battle {
   }
 
   start(p1Deck: DeckList, p2Deck: DeckList, firstPlayer: PlayerId | null = null): void {
+    if (!this.options.skipValidation) {
+      requireValidDeck(p1Deck);
+      requireValidDeck(p2Deck);
+    }
     const s = this.state;
     s.turn = 0;
     s.phase = "setup";
