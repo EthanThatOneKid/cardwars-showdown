@@ -3,8 +3,9 @@ import { FACTIONS } from "./types.js";
 import { makeRng, nextIntBelow, shuffle } from "./rng.js";
 import { requireCard } from "./dex.js";
 import { singles } from "./data/formats.js";
-import { draw, log, makeInstance, other, randomDiscard, side } from "./side.js";
+import { draw, log, makeInstance, other, side } from "./side.js";
 import { faceUpFactions } from "./field.js";
+import { atk, canFight as canFightEvent, def, runEvent } from "./events.js";
 
 export class Battle {
   state: BattleState;
@@ -212,6 +213,7 @@ export class Battle {
     if (!card) return { ok: false, reason: "No Creature in that lane." };
     if (card.exhausted) return { ok: false, reason: `${card.name} is exhausted and cannot Fight.` };
     if (card.flooped) return { ok: false, reason: `${card.name} is Flooped and cannot Fight.` };
+    if (!canFightEvent(this.state, laneIndex, player)) return { ok: false, reason: `${card.name} cannot be Attacked right now (protection).` };
     return { ok: true };
   }
 
@@ -221,35 +223,39 @@ export class Battle {
     const s = this.state;
     const attacker = side(s, player).lanes[laneIndex].creature!;
     const defender = s.sides[other(player)].lanes[laneIndex].creature ?? null;
-    const atkValue = attacker.atk ?? 0;
+    const atkValue = atk(s, attacker);
     attacker.exhausted = true;
 
     if (!defender) {
       s.sides[other(player)].hp = Math.max(0, s.sides[other(player)].hp - atkValue);
       log(s, player, `${attacker.name} attacks directly for ${atkValue}.`, "fight");
+      runEvent(s, "onAfterFight", { lane: laneIndex, player });
       this.checkWin();
       return { ok: true };
     }
 
-    const defValue = defender.atk ?? 0;
+    const defValue = atk(s, defender);
     defender.damage += atkValue;
     attacker.damage += defValue;
     log(s, player, `${attacker.name} (${atkValue} ATK) fights ${defender.name} (${defValue} ATK) in lane ${laneIndex + 1}.`, "fight");
 
-    const defThreshold = defender.def ?? 0;
-    const atkThreshold = attacker.def ?? 0;
-    if (defender.damage >= defThreshold) {
+    const defThreshold = def(s, defender);
+    const atkThreshold = def(s, attacker);
+    const defenderDead = defender.damage >= defThreshold;
+    const attackerDead = attacker.damage >= atkThreshold;
+    if (defenderDead) {
       side(s, other(player)).lanes[laneIndex].creature = null;
       defender.lane = null;
       s.sides[other(player)].discard.push(defender);
       log(s, "system", `${defender.name} is destroyed.`, "fight");
     }
-    if (attacker.damage >= atkThreshold) {
+    if (attackerDead) {
       side(s, player).lanes[laneIndex].creature = null;
       attacker.lane = null;
       s.sides[player].discard.push(attacker);
       log(s, "system", `${attacker.name} is destroyed.`, "fight");
     }
+    runEvent(s, "onAfterFight", { lane: laneIndex, player });
     this.checkWin();
     return { ok: true };
   }

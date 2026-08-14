@@ -73,7 +73,7 @@ export interface Ability {
 }
 
 export type AbilityEffect =
-  | { op: "block"; lanes: "adjacent"; note?: string }
+  | { op: "block"; lanes?: "adjacent"; note?: string }
   | { op: "scale"; per: string; atk?: number; def?: number }
   | { op: "flipLandscape"; faction?: string; lane: "this"; face: "up" | "down" }
   | { op: "modify"; targets: string; atk?: number; def?: number; duration?: string }
