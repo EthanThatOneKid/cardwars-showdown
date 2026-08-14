@@ -137,6 +137,8 @@ export interface SideState {
   lanes: LaneState[];
   mulliganUsed: boolean;
   turnsPlayed: number;
+  creaturesPlayedThisTurn: number;
+  spellsPlayedThisTurn: number;
 }
 
 export type BattlePhase = "setup" | "ready" | "draw" | "main" | "fight" | "end" | "finished";

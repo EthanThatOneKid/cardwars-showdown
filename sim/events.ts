@@ -45,6 +45,21 @@ export function gatherHandlers(
   return out;
 }
 
+export function gatherHandlersIncludingHand(
+  battle: BattleState,
+  window: EventWindow,
+): WindowHandler[] {
+  const out = gatherHandlers(battle, window);
+  for (const pid of ["p1", "p2"] as PlayerId[]) {
+    for (const card of battle.sides[pid].hand) {
+      for (const ability of card.abilities) {
+        if (ability.window === window) out.push({ card, ability });
+      }
+    }
+  }
+  return out;
+}
+
 export function isTriggerSuppressed(battle: BattleState, card: CardInstance): boolean {
   if (card.lane === null) return false;
   const laneIndex = card.lane;
@@ -65,7 +80,10 @@ export interface EventResult {
 
 export function runEvent(battle: BattleState, window: EventWindow, bag: EventBag): EventResult {
   let blocked = false;
-  const handlers = gatherHandlers(battle, window, bag);
+  const handlers =
+    window === "onCanPlay"
+      ? gatherHandlersIncludingHand(battle, window).filter(h => h.card.owner === bag.player)
+      : gatherHandlers(battle, window, bag);
   for (const h of handlers) {
     const effect = h.ability.effect;
     if (effect.op === "unsupported") {
@@ -179,4 +197,30 @@ export function atk(battle: BattleState, card: CardInstance): number {
 
 export function def(battle: BattleState, card: CardInstance): number {
   return calcStat(battle, card, "def", card.def ?? 0);
+}
+
+export function calcCost(battle: BattleState, card: CardInstance, base: number): number {
+  let value = base;
+  for (const h of gatherHandlersIncludingHand(battle, "onCalculateCost")) {
+    if (h.card.uid !== card.uid) continue;
+    if (h.ability.kind !== "cost-modifier") continue;
+    const eff = h.ability.effect;
+    if (eff.op === "unsupported") continue;
+    if (eff.op === "modifyCost") {
+      const per = eff.per ? resolveCount(battle, card, eff.per) : 1;
+      value += eff.n * per;
+    }
+  }
+  return Math.max(0, value);
+}
+
+export function resolveCount(battle: BattleState, card: CardInstance, per: string): number {
+  switch (per) {
+    case "creatures-played-this-turn":
+      return battle.sides[card.owner].turnsPlayed > 0
+        ? battle.sides[card.owner].lanes.filter(l => l.creature).length
+        : 0;
+    default:
+      return 0;
+  }
 }

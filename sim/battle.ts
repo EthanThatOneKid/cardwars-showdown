@@ -5,7 +5,7 @@ import { requireCard } from "./dex.js";
 import { singles } from "./data/formats.js";
 import { draw, log, makeInstance, other, side } from "./side.js";
 import { faceUpFactions } from "./field.js";
-import { atk, canFight as canFightEvent, def, runEvent } from "./events.js";
+import { atk, calcCost, canFight as canFightEvent, canPlay as canPlayEvent, def, runEvent } from "./events.js";
 import { requireValidDeck } from "./validate.js";
 
 export class Battle {
@@ -54,6 +54,8 @@ export class Battle {
       sideState.resources = 0;
       sideState.mulliganUsed = false;
       sideState.turnsPlayed = 0;
+      sideState.creaturesPlayedThisTurn = 0;
+      sideState.spellsPlayedThisTurn = 0;
       sideState.lanes = deriveLandscapes(deck, s.rng);
     }
 
@@ -102,25 +104,32 @@ export class Battle {
     const active = side(s, s.activePlayer);
     active.resources = s.resourcesPerTurn;
     active.turnsPlayed += 1;
+    active.creaturesPlayedThisTurn = 0;
+    active.spellsPlayedThisTurn = 0;
     draw(s, s.activePlayer);
     log(s, s.activePlayer, `Turn ${s.turn} begins for ${s.activePlayer}.`, "draw");
     s.phase = "main";
   }
 
   canPlay(player: PlayerId, handIndex: number): { ok: true } | { ok: false; reason: string } {
-    const s = side(this.state, player);
-    const card = s.hand[handIndex];
+    const s = this.state;
+    if (s.phase === "finished") return { ok: false, reason: "Battle over." };
+    if (s.phase !== "main") return { ok: false, reason: "Can only play cards during your main phase." };
+    const hand = side(s, player).hand;
+    const card = hand[handIndex];
     if (!card) return { ok: false, reason: "No card at that hand index." };
-    if (s.resources < card.actionCost) return { ok: false, reason: `Not enough Actions (need ${card.actionCost}).` };
-    if (card.actionCost > 0) {
-      const control = faceUpFactions(this.state, player)[card.faction] ?? 0;
+    const cost = calcCost(s, card, card.actionCost);
+    if (s.sides[player].resources < cost) return { ok: false, reason: `Not enough Actions (need ${cost}).` };
+    if (cost > 0) {
+      const control = faceUpFactions(s, player)[card.faction] ?? 0;
       if (card.faction !== "rainbow" && control < card.landscapeCost) {
         return { ok: false, reason: `Need ${card.landscapeCost} face-up ${card.faction} Landscape(s).` };
       }
-      if (card.faction === "rainbow" && faceUpCountForRainbow(this.state, player) < card.landscapeCost) {
+      if (card.faction === "rainbow" && faceUpCountForRainbow(s, player) < card.landscapeCost) {
         return { ok: false, reason: `Need ${card.landscapeCost} face-up Landscape(s).` };
       }
     }
+    if (!canPlayEvent(s, player, card)) return { ok: false, reason: `${card.name} cannot be played right now (play restriction).` };
     return { ok: true };
   }
 
@@ -128,12 +137,16 @@ export class Battle {
     const check = this.canPlay(player, handIndex);
     if (!check.ok) return check;
     const s = side(this.state, player);
-    const card = s.hand.splice(handIndex, 1)[0];
-    s.resources -= card.actionCost;
+    const card = s.hand[handIndex];
+    const cost = calcCost(this.state, card, card.actionCost);
+    s.hand.splice(handIndex, 1);
+    s.resources -= cost;
 
     if (card.type === "spell") {
       s.discard.push(card);
+      s.spellsPlayedThisTurn += 1;
       log(this.state, player, `${player} plays spell ${card.name}.`, "main");
+      runEvent(this.state, "onAfterPlayCard", { player, card, lane: laneIndex });
       return { ok: true };
     }
 
@@ -147,13 +160,14 @@ export class Battle {
       const existing = laneState.creature;
       if (existing && existing.exhausted) {
         s.hand.push(card);
-        s.resources += card.actionCost;
+        s.resources += cost;
         return { ok: false, reason: "Cannot replace a Flooped/Activated Creature." };
       }
       laneState.creature = card;
       card.lane = laneIndex;
       card.exhausted = false;
       card.flooped = false;
+      s.creaturesPlayedThisTurn += 1;
       if (existing) {
         existing.lane = null;
         s.discard.push(existing);
@@ -161,6 +175,7 @@ export class Battle {
       } else {
         log(this.state, player, `${player} plays ${card.name} into lane ${laneIndex + 1}.`, "main");
       }
+      runEvent(this.state, "onEnterPlay", { player, card, lane: laneIndex, replaced: existing !== null });
       return { ok: true };
     }
 
@@ -177,6 +192,7 @@ export class Battle {
       } else {
         log(this.state, player, `${player} plays building ${card.name} under lane ${laneIndex + 1}.`, "main");
       }
+      runEvent(this.state, "onEnterPlay", { player, card, lane: laneIndex, replaced: existing !== null });
       return { ok: true };
     }
 
@@ -186,6 +202,7 @@ export class Battle {
 
   canFloop(player: PlayerId, laneIndex: number): { ok: true } | { ok: false; reason: string } {
     if (this.state.phase === "finished") return { ok: false, reason: "Battle over." };
+    if (this.state.phase !== "main") return { ok: false, reason: "Can only Floop during your main phase." };
     if (this.firstPlayerTurnOne() && player === this.state.firstPlayer) {
       return { ok: false, reason: "First player may not Floop on the first turn." };
     }
@@ -211,6 +228,10 @@ export class Battle {
 
   canFight(player: PlayerId, laneIndex: number): { ok: true } | { ok: false; reason: string } {
     if (this.state.phase === "finished") return { ok: false, reason: "Battle over." };
+    if (this.state.phase !== "main" && this.state.phase !== "fight") {
+      return { ok: false, reason: "Fights happen after the main phase." };
+    }
+    if (player !== this.state.activePlayer) return { ok: false, reason: "Only the active player's Creatures Fight." };
     if (this.firstPlayerTurnOne() && player === this.state.firstPlayer) {
       return { ok: false, reason: "First player may not Fight on the first turn." };
     }
@@ -260,6 +281,12 @@ export class Battle {
       s.sides[player].discard.push(attacker);
       log(s, "system", `${attacker.name} is destroyed.`, "fight");
     }
+    for (const dead of defenderDead ? [defender] : []) {
+      runEvent(s, "onLeavePlay", { player: other(player), card: dead, lane: laneIndex });
+    }
+    for (const dead of attackerDead ? [attacker] : []) {
+      runEvent(s, "onLeavePlay", { player, card: dead, lane: laneIndex });
+    }
     runEvent(s, "onAfterFight", { lane: laneIndex, player });
     this.checkWin();
     return { ok: true };
@@ -267,8 +294,9 @@ export class Battle {
 
   drawAction(player: PlayerId): { ok: true } | { ok: false; reason: string } {
     const s = side(this.state, player);
-    if (s.resources < 1) return { ok: false, reason: "No Actions left." };
     if (this.state.phase === "finished") return { ok: false, reason: "Battle over." };
+    if (this.state.phase !== "main") return { ok: false, reason: "Can only spend an Action to draw during your main phase." };
+    if (s.resources < 1) return { ok: false, reason: "No Actions left." };
     s.resources -= 1;
     draw(this.state, player);
     log(this.state, player, `${player} spends 1 Action to draw.`, "main");
@@ -335,6 +363,8 @@ function emptySide(player: PlayerId, lanes: number): BattleState["sides"]["p1"] 
     })),
     mulliganUsed: false,
     turnsPlayed: 0,
+    creaturesPlayedThisTurn: 0,
+    spellsPlayedThisTurn: 0,
   };
 }
 
