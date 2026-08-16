@@ -237,6 +237,52 @@ describe("protocol seam", () => {
     });
   });
 
+  it("exposes the opponent's public hp without leaking hidden zones", () => {
+    playFullGame(11, {
+      onRequest: (view, state) => {
+        const theirs = state.sides[view.player === "p1" ? "p2" : "p1"];
+        expect(view.opponentHp).toBe(theirs.hp);
+      },
+    });
+  });
+
+  it("tracks lastRequest per player through dispatch", () => {
+    const run = playFullGame(8);
+    const pb = new ProtocolBattle({ seed: 8 });
+    pb.start(run.p1Deck, run.p2Deck, "p1");
+    const lastSeen: Record<PlayerId, Request | null> = { p1: null, p2: null };
+    for (const { player, decision } of run.input.decisions) {
+      const res = pb.submit(player, decision, pb.currentRequestId(player));
+      expect(res.ok).toBe(true);
+      for (const ev of res.events) {
+        if (ev.type === "request") {
+          lastSeen[ev.request.player] = ev.request;
+          const last = pb.lastRequest(ev.request.player);
+          expect(last).toEqual(ev.request);
+        }
+      }
+    }
+    expect(pb.lastRequest("p1")).toEqual(lastSeen.p1);
+    expect(pb.lastRequest("p2")).toEqual(lastSeen.p2);
+  });
+
+  it("fullLog returns cumulative narrative log at game end", () => {
+    const run = playFullGame(9);
+    const pb = new ProtocolBattle({ seed: 9 });
+    pb.start(run.p1Deck, run.p2Deck, "p1");
+    for (const { player, decision } of run.input.decisions) {
+      pb.submit(player, decision, pb.currentRequestId(player));
+    }
+    expect(pb.fullLog()).toEqual(run.log);
+  });
+
+  it("replays resynced input log to byte-identical state.log", () => {
+    const run = playFullGame(10);
+    const replayed = replayBattle(run.input, run.p1Deck, run.p2Deck);
+    expect(replayed.state.log).toEqual(run.log);
+    expect(replayed.state.winner).toBe(run.winner);
+  });
+
   it("plays a full game via decisions and replays to the same state.log", () => {
     const run = playFullGame(7);
     expect(run.ended).toBe(true);

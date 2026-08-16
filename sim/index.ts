@@ -6,6 +6,7 @@ export * from "./field.js";
 export * from "./side.js";
 export * from "./battle.js";
 export * from "./protocol.js";
+export * from "./wire.js";
 export * from "./validate.js";
 export * from "./runner.js";
 export * from "./data/formats.js";

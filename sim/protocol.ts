@@ -64,6 +64,7 @@ export interface PlayerView {
   activePlayer: PlayerId;
   winner: PlayerId | null;
   hp: number;
+  opponentHp: number;
   maxHp: number;
   resources: number;
   resourcesPerTurn: number;
@@ -118,6 +119,7 @@ export class ProtocolBattle {
   private finished = false;
   private pendingMulligan = new Set<PlayerId>();
   private requestIds: Record<PlayerId, RequestId> = { p1: 0, p2: 0 };
+  private lastRequests: Record<PlayerId, Request | null> = { p1: null, p2: null };
   private nextRequestId = 1;
   private lastLogLength = 0;
   private input: InputLog;
@@ -129,6 +131,15 @@ export class ProtocolBattle {
 
   currentRequestId(player: PlayerId): RequestId {
     return this.requestIds[player];
+  }
+
+  lastRequest(player: PlayerId): Request | null {
+    const req = this.lastRequests[player];
+    return req ? structuredClone(req) : null;
+  }
+
+  fullLog(): BattleLogEntry[] {
+    return this.battle.state.log.slice();
   }
 
   inputLog(): InputLog {
@@ -249,7 +260,9 @@ export class ProtocolBattle {
   private buildRequest(player: PlayerId): Request {
     const requestId = this.nextRequestId++;
     this.requestIds[player] = requestId;
-    return { player, requestId, view: this.buildView(player, requestId) };
+    const request = { player, requestId, view: this.buildView(player, requestId) };
+    this.lastRequests[player] = request;
+    return request;
   }
 
   private buildView(player: PlayerId, requestId: RequestId): PlayerView {
@@ -264,6 +277,7 @@ export class ProtocolBattle {
       activePlayer: s.activePlayer,
       winner: s.winner,
       hp: mine.hp,
+      opponentHp: theirs.hp,
       maxHp: s.maxHp,
       resources: mine.resources,
       resourcesPerTurn: s.resourcesPerTurn,
