@@ -130,6 +130,21 @@ function uidsInView(view: PlayerView): Set<string> {
   return uids;
 }
 
+function collectUids(state: BattleState): string[] {
+  const uids: string[] = [];
+  for (const pid of ["p1", "p2"] as PlayerId[]) {
+    const s = state.sides[pid];
+    uids.push(...s.hand.map(c => c.uid));
+    uids.push(...s.deck.map(c => c.uid));
+    uids.push(...s.discard.map(c => c.uid));
+    for (const lane of s.lanes) {
+      if (lane.creature) uids.push(lane.creature.uid);
+      if (lane.building) uids.push(lane.building.uid);
+    }
+  }
+  return uids;
+}
+
 describe("protocol seam", () => {
   it("issues mulligan requests to both players before turn 1", () => {
     const { p1: p1Deck, p2: p2Deck } = legalDecks(1);
@@ -250,5 +265,13 @@ describe("protocol seam", () => {
     expect(replayed.state.log).toEqual(run.log);
     expect(replayed.state.winner).toBe(run.winner);
     expect(replayed.state.turn).toBe(run.turn);
+  });
+
+  it("replays reproduce identical card uids across fresh instances (#48)", () => {
+    const run = playFullGame(12);
+    const a = replayBattle(run.input, run.p1Deck, run.p2Deck);
+    const b = replayBattle(run.input, run.p1Deck, run.p2Deck);
+    expect(a.toJSON()).toEqual(b.toJSON());
+    expect(collectUids(a.state)).toEqual(collectUids(b.state));
   });
 });
