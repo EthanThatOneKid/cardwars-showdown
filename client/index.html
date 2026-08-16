@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Card Wars Showdown</title>
+  <style>
+    :root {
+      --bg: #10141c;
+      --panel: #1a2030;
+      --ink: #e8ecf4;
+      --muted: #8a93a6;
+      --accent: #59c2ff;
+      --danger: #ff6b6b;
+      --lane: #232a3c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    h1 { font-size: 1.2rem; margin: 0 0 12px; }
+    button {
+      background: var(--accent);
+      color: #04202f;
+      border: 0;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { background: #3a4358; color: #7c8699; cursor: not-allowed; }
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      background: #0c1017;
+      color: var(--ink);
+      border: 1px solid #2c3547;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+    #deck-screen, #game-over {
+      max-width: 640px;
+      margin: 8vh auto;
+      padding: 24px;
+      background: var(--panel);
+      border-radius: 12px;
+    }
+    #deck-errors { color: var(--danger); font-size: 13px; margin: 8px 0; white-space: pre-wrap; }
+    #battle-screen { max-width: 1000px; margin: 0 auto; padding: 12px; }
+    #topbar {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      padding: 8px 4px;
+      font-weight: 600;
+      border-bottom: 1px solid #2c3547;
+      margin-bottom: 10px;
+    }
+    #status { color: var(--muted); font-weight: 400; margin-left: auto; }
+    .section-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 6px 2px; }
+    .lanes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .lane {
+      background: var(--lane);
+      border: 1px solid #2c3547;
+      border-radius: 8px;
+      padding: 6px;
+      min-height: 148px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .lane.selectable { border-color: var(--accent); cursor: pointer; box-shadow: 0 0 0 1px var(--accent); }
+    .landscape { font-size: 11px; color: var(--muted); }
+    .card {
+      background: #28314a;
+      border: 1px solid #39445f;
+      border-radius: 6px;
+      padding: 5px 6px;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .card .name { font-weight: 700; }
+    .card .meta { color: var(--muted); }
+    .card.unsupported { outline: 2px dashed #c78b1f; }
+    .card.playable { cursor: pointer; border-color: var(--accent); }
+    .card.selected { background: #154a6b; }
+    .card.fightable { cursor: pointer; }
+    .card.fightable:hover { border-color: var(--danger); }
+    .card.face-down { background: repeating-linear-gradient(45deg, #28314a, #28314a 6px, #222a40 6px, #222a40 12px); }
+    .card .badge { color: #e0a23a; font-weight: 700; }
+    .hand { display: flex; gap: 6px; min-height: 74px; padding: 4px 0; flex-wrap: wrap; }
+    .hand .card { width: 104px; }
+    .info { font-size: 12px; color: var(--muted); }
+    .info b { color: var(--ink); }
+    #log {
+      background: #0c1017;
+      border: 1px solid #2c3547;
+      border-radius: 8px;
+      padding: 8px;
+      height: 132px;
+      overflow-y: auto;
+      font-size: 12px;
+      font-family: ui-monospace, monospace;
+      margin: 10px 0;
+    }
+    #log .entry { margin: 1px 0; }
+    #log .system { color: var(--muted); }
+    #controls { display: flex; gap: 8px; margin-top: 10px; }
+    #mulligan-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--panel);
+      border-top: 1px solid #2c3547;
+      padding: 12px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+    }
+    .floop-btn { font-size: 10px; padding: 2px 6px; margin-top: 2px; background: #7a5bd6; }
+    #game-over { text-align: center; }
+    .draw-state { color: #e0a23a; }
+  </style>
+</head>
+<body>
+  <div id="deck-screen">
+    <h1>Card Wars Showdown</h1>
+    <p style="color:var(--muted);font-size:13px">
+      Paste a deck list (comma/whitespace-separated card ids, 40+ cards, max 3 copies each)
+      or generate a random legal deck.
+    </p>
+    <textarea id="deck-input" spellcheck="false" placeholder="e.g. cow, cool-dog, corn-ronin, ..."></textarea>
+    <div id="deck-errors"></div>
+    <div id="deck-status" style="color:var(--muted);font-size:13px;margin-top:8px"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="join-btn">Join battle</button>
+      <button id="generate-btn" style="background:#7a5bd6">Generate random deck</button>
+    </div>
+  </div>
+
+  <div id="battle-screen" hidden>
+    <div id="topbar">
+      <span id="phase"></span>
+      <span id="turn"></span>
+      <span id="status"></span>
+    </div>
+    <div id="opponent">
+      <div class="section-label">Opponent</div>
+      <div class="info">
+        HP <b id="opp-hp"></b> · deck <b id="opp-deck"></b> · discard <b id="opp-discard"></b>
+      </div>
+      <div class="hand" id="opp-hand"></div>
+      <div class="lanes" id="opp-lanes"></div>
+    </div>
+    <div id="log"></div>
+    <div id="me">
+      <div class="section-label">You</div>
+      <div class="lanes" id="my-lanes"></div>
+      <div class="hand" id="my-hand"></div>
+      <div class="info">
+        HP <b id="my-hp"></b> · deck <b id="my-deck"></b> · discard <b id="my-discard"></b> · actions <b id="my-actions"></b>
+      </div>
+      <div id="controls">
+        <button id="draw-action" hidden>Draw (1 action)</button>
+        <button id="end-turn" hidden>End Turn</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mulligan-bar" hidden>
+    <span style="font-weight:600">Opening hand — mulligan?</span>
+    <button id="mulligan-yes" style="background:#7a5bd6">Mulligan</button>
+    <button id="mulligan-no">Keep</button>
+  </div>
+
+  <div id="game-over" hidden>
+    <h2 id="game-over-text"></h2>
+    <button id="play-again">Play again</button>
+  </div>
+
+  <script type="module" src="/client.js"></script>
+</body>
+</html>
