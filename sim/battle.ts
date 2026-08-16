@@ -47,7 +47,7 @@ export class Battle {
     for (const pid of ["p1", "p2"] as PlayerId[]) {
       const deck = pid === "p1" ? p1Deck : p2Deck;
       const sideState = s.sides[pid];
-      sideState.deck = shuffle(s.rng, deck.cards.map(id => makeInstance(requireCard(id), pid)));
+      sideState.deck = shuffle(s.rng, deck.cards.map((id, i) => makeInstance(requireCard(id), pid, i)));
       sideState.hand.length = 0;
       sideState.discard.length = 0;
       sideState.hp = s.maxHp;

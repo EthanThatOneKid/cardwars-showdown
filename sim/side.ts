@@ -1,17 +1,18 @@
 import type { BattleState, CardInstance, CardTemplate, PlayerId, SideState } from "./types.js";
 
-let nextUid = 1;
-
-export function freshUid(): string {
-  return `card-${nextUid++}`;
+/** Deterministic card identity. Instances are created from a deck list, so
+ * (owner, card id, deck position) uniquely identifies a card within a battle and
+ * reproduces byte-identically when the same input log is replayed (#48). */
+export function cardUid(owner: PlayerId, id: string, serial: number): string {
+  return `${owner}#${id}#${serial}`;
 }
 
-export function makeInstance(template: CardTemplate, owner: PlayerId): CardInstance {
+export function makeInstance(template: CardTemplate, owner: PlayerId, serial = 0): CardInstance {
   return {
     ...template,
     abilities: [...template.abilities],
     owner,
-    uid: freshUid(),
+    uid: cardUid(owner, template.id, serial),
     damage: 0,
     exhausted: false,
     flooped: false,
